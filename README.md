@@ -1,20 +1,23 @@
-# 🚀 Next.js Template with shadcn/ui
+# 🚀 NagerSetu
 
-A modern, production-ready Next.js template with Tailwind CSS, shadcn/ui components, and TypeScript pre-configured. Perfect for quickly bootstrapping your next project with industry best practices.
+A modern, production-ready Next.js project template bootstrapped with Tailwind CSS, shadcn/ui components, and TypeScript. Designed for rapid development, scalability, and best practices for web applications.
 
-![Next.js Template](client/public/nextjs.png)
+[View on GitHub](https://github.com/alokyadav9045/nagersetu)
+
+---
 
 ## ✨ Features
 
-- ⚡ **Next.js 15** - Latest version with App Router and Turbopack
-- 🎨 **Tailwind CSS 4** - Utility-first CSS framework
-- 🧩 **shadcn/ui** - Beautiful, accessible components built on Radix UI
-- 📱 **Responsive Design** - Mobile-first approach
-- 🔧 **TypeScript** - Full type safety
-- 🎯 **ESLint** - Code linting and formatting
-- 🚀 **Vercel Ready** - Optimized for deployment
-- 🌙 **Dark Mode** - Built-in dark/light theme support
-- 📦 **Component Library** - Pre-built UI components
+- **Next.js 15** with App Router and Turbopack
+- **Tailwind CSS 4** for utility-first styling
+- **shadcn/ui** and **Radix UI** for accessible, beautiful components
+- **TypeScript** for type safety
+- **ESLint** for linting and formatting
+- **Responsive design** & built-in dark mode
+- **Vercel Ready** for easy deployment
+- **Pre-built UI library** (buttons, cards, inputs, etc.)
+
+---
 
 ## 🛠️ Tech Stack
 
@@ -25,13 +28,15 @@ A modern, production-ready Next.js template with Tailwind CSS, shadcn/ui compone
 - **Icons:** Lucide React
 - **Package Manager:** npm
 
+---
+
 ## 🚀 Quick Start
 
-### 1. Fork or Clone this repository
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/AhqafCoder/nextjs-template.git
-cd nextjs-template
+git clone https://github.com/alokyadav9045/nagersetu.git
+cd nagersetu
 ```
 
 ### 2. Install dependencies
@@ -47,112 +52,116 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view your app.
+
+---
 
 ## 📁 Project Structure
 
 ```
-client/
-├── src/
-│   ├── app/
-│   │   ├── globals.css
-│   │   ├── layout.tsx
-│   │   └── page.tsx
-│   ├── components/
-│   │   └── ui/
-│   │       └── button.tsx
-│   └── lib/
-│       └── utils.ts
-├── public/
-├── components.json
-├── package.json
-├── tailwind.config.js
-└── tsconfig.json
+nagersetu/
+├── .vscode/
+├── client/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── globals.css
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   ├── components/
+│   │   │   └── ui/
+│   │   │       └── button.tsx
+│   │   └── lib/
+│   │       └── utils.ts
+│   ├── public/
+│   ├── components.json
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── tsconfig.json
+├── README.md
 ```
+
+---
 
 ## 🎨 Available Components
 
-This template comes with shadcn/ui components pre-configured:
+Pre-configured with shadcn/ui:
 
-- **Button** - Various button styles and sizes
-- **Card** - Content containers
-- **Input** - Form inputs
-- **Label** - Form labels
-- And many more...
+- **Button** (primary, secondary, etc.)
+- **Card**
+- **Input**
+- **Label**
+- And more...
 
-### Adding New Components
-
-To add more shadcn/ui components:
+### Add More Components
 
 ```bash
 npx shadcn@latest add [component-name]
 ```
 
-Example:
+Examples:
 ```bash
 npx shadcn@latest add card
 npx shadcn@latest add input
 npx shadcn@latest add dialog
 ```
 
+---
+
 ## 🔧 Configuration
 
-### Tailwind CSS
+- **Tailwind CSS:** Edit `tailwind.config.js` to customize your design system.
+- **shadcn/ui:** Configured via `components.json` (Style: New York, Base Color: Zinc, CSS Variables: Enabled, Icon Library: Lucide React).
 
-The template uses Tailwind CSS 4 with custom configuration. Modify `tailwind.config.js` to customize your design system.
-
-### shadcn/ui
-
-Components are configured in `components.json`:
-- **Style:** New York
-- **Base Color:** Zinc
-- **CSS Variables:** Enabled
-- **Icon Library:** Lucide React
+---
 
 ## 📝 Scripts
 
-- `npm run dev` - Start development server with Turbopack
-- `npm run build` - Build for production
+- `npm run dev` - Start development server
+- `npm run build` - Production build
 - `npm start` - Start production server
 - `npm run lint` - Run ESLint
+
+---
 
 ## 🚀 Deployment
 
 ### Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new).
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/alokyadav9045/nagersetu)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/nextjs-template)
-
-### Other Platforms
-
-This template works with any platform that supports Next.js:
+Other platforms supported:
 - Netlify
 - Railway
 - Render
 - AWS Amplify
 
+---
+
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! Please submit a Pull Request.
 
 1. Fork the project
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
+
+---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE).
+
+---
 
 ## 🙏 Acknowledgments
 
-- [Next.js](https://nextjs.org/) - The React framework
-- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
-- [shadcn/ui](https://ui.shadcn.com/) - Beautiful component library
-- [Radix UI](https://www.radix-ui.com/) - Low-level UI primitives
-- [Lucide](https://lucide.dev/) - Beautiful & consistent icons
+- [Next.js](https://nextjs.org/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [shadcn/ui](https://ui.shadcn.com/)
+- [Radix UI](https://www.radix-ui.com/)
+- [Lucide](https://lucide.dev/)
 
 ---
 
