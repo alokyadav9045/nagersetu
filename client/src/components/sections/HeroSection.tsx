@@ -15,6 +15,9 @@ interface CounterProps {
   prefix?: string
 }
 
+
+
+
 const Counter = ({ end, duration, suffix = '', prefix = '' }: CounterProps) => {
   const [count, setCount] = useState(0)
 
