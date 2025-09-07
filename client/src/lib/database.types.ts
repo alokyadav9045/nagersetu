@@ -8,7 +8,9 @@ export interface Database {
           full_name: string | null
           phone: string | null
           address: string | null
-          role: 'citizen' | 'admin' | 'authority'
+          role: 'citizen' | 'admin' | 'authority' | 'moderator'
+          is_active: boolean
+          last_login: string | null
           created_at: string
           updated_at: string
         }
@@ -18,14 +20,18 @@ export interface Database {
           full_name?: string | null
           phone?: string | null
           address?: string | null
-          role?: 'citizen' | 'admin' | 'authority'
+          role?: 'citizen' | 'admin' | 'authority' | 'moderator'
+          is_active?: boolean
         }
         Update: {
           email?: string
           full_name?: string | null
           phone?: string | null
           address?: string | null
-          role?: 'citizen' | 'admin' | 'authority'
+          role?: 'citizen' | 'admin' | 'authority' | 'moderator'
+          is_active?: boolean
+          last_login?: string | null
+          updated_at?: string
         }
       }
       issues: {
@@ -34,11 +40,13 @@ export interface Database {
           title: string
           description: string
           category_id: number
+          category: string | null
           status: 'pending' | 'in_progress' | 'resolved' | 'rejected'
           priority: 'low' | 'medium' | 'high' | 'urgent'
           location_lat: number | null
           location_lng: number | null
           location_address: string | null
+          location: string | null
           images: string[] | null
           upvotes: number
           downvotes: number
@@ -53,11 +61,13 @@ export interface Database {
           title: string
           description: string
           category_id: number
+          category?: string | null
           status?: 'pending' | 'in_progress' | 'resolved' | 'rejected'
           priority?: 'low' | 'medium' | 'high' | 'urgent'
           location_lat?: number | null
           location_lng?: number | null
           location_address?: string | null
+          location?: string | null
           images?: string[] | null
           citizen_id: string
           assigned_to?: string | null
@@ -65,11 +75,14 @@ export interface Database {
         Update: {
           title?: string
           description?: string
+          category?: string | null
           status?: 'pending' | 'in_progress' | 'resolved' | 'rejected'
           priority?: 'low' | 'medium' | 'high' | 'urgent'
+          location?: string | null
           assigned_to?: string | null
           resolution_note?: string | null
           resolved_at?: string | null
+          updated_at?: string
         }
       }
       issue_categories: {
@@ -108,6 +121,49 @@ export interface Database {
           issue_id: string
           user_id: string
           comment: string
+        }
+      }
+      issue_updates: {
+        Row: {
+          id: string
+          issue_id: string
+          update_text: string
+          admin_id: string | null
+          created_at: string
+        }
+        Insert: {
+          issue_id: string
+          update_text: string
+          admin_id?: string | null
+        }
+        Update: {
+          update_text?: string
+          admin_id?: string | null
+        }
+      }
+      activity_logs: {
+        Row: {
+          id: string
+          action: string
+          description: string
+          user_id: string
+          entity_type: 'issue' | 'user' | 'system'
+          entity_id: string
+          metadata: any
+          created_at: string
+        }
+        Insert: {
+          action: string
+          description: string
+          user_id: string
+          entity_type: 'issue' | 'user' | 'system'
+          entity_id: string
+          metadata?: any
+        }
+        Update: {
+          action?: string
+          description?: string
+          metadata?: any
         }
       }
     }

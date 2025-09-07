@@ -1,229 +1,200 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { BarChart3, Users, AlertCircle, CheckCircle, Clock, TrendingUp } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
+import { supabase } from '@/lib/supabase'
+import { Users, FileText, CheckCircle, Clock } from 'lucide-react'
+import { Toaster, toast } from 'react-hot-toast'
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [userProfile, setUserProfile] = useState<any>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalIssues: 0,
+    pendingIssues: 0,
+    resolvedIssues: 0
+  })
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState<any>({})
-  const [categoryData, setCategoryData] = useState<any[]>([])
-  const [statusData, setStatusData] = useState<any[]>([])
-  const [trendsData, setTrendsData] = useState<any[]>([])
 
   useEffect(() => {
-    checkAdminAccess()
+    checkAuth()
   }, [])
 
-  const checkAdminAccess = async () => {
-    const { data: { user }, error } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/')
-      return
+  const checkAuth = () => {
+    const adminSession = localStorage.getItem('nagarsetu_admin_session')
+    if (adminSession) {
+      try {
+        const session = JSON.parse(adminSession)
+        const now = new Date().getTime()
+        const sessionTime = new Date(session.timestamp).getTime()
+        const hoursDiff = (now - sessionTime) / (1000 * 60 * 60)
+        
+        if (hoursDiff < 24) {
+          setIsAuthenticated(true)
+          fetchStats()
+        } else {
+          localStorage.removeItem('nagarsetu_admin_session')
+          router.push('/admin/login')
+        }
+      } catch (error) {
+        localStorage.removeItem('nagarsetu_admin_session')
+        router.push('/admin/login')
+      }
+    } else {
+      router.push('/admin/login')
     }
-
-    setUser(user)
-
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile || (profile as any).role === 'citizen') {
-      router.push('/')
-      return
-    }
-
-    setUserProfile(profile)
-    await fetchDashboardData()
     setLoading(false)
   }
 
-  const fetchDashboardData = async () => {
+  const fetchStats = async () => {
     try {
-      // Basic stats
-      const { data: allIssues } = await supabase
-        .from('issues')
-        .select('*')
+      const [usersResult, issuesResult] = await Promise.all([
+        supabase.from('user_profiles').select('*'),
+        supabase.from('issues').select('*')
+      ])
 
-      const { data: todayIssues } = await supabase
-        .from('issues')
-        .select('*')
-        .gte('created_at', new Date().toISOString().split('T')[0])
+      const users = usersResult.data || []
+      const issues = issuesResult.data || []
 
-      const statsData = {
-        totalIssues: allIssues?.length || 0,
-        pendingIssues: (allIssues as any[])?.filter(i => i.status === 'pending').length || 0,
-        resolvedIssues: (allIssues as any[])?.filter(i => i.status === 'resolved').length || 0,
-        todayIssues: todayIssues?.length || 0,
-        resolutionRate: (allIssues as any[])?.length ? 
-          Math.round(((allIssues as any[]).filter(i => i.status === 'resolved').length / (allIssues as any[]).length) * 100) : 0
-      }
-      setStats(statsData)
-
-      // Category breakdown
-      const { data: categoryStats } = await supabase
-        .from('issues')
-        .select(`
-          category_id,
-          issue_categories (name, color)
-        `)
-
-      const categoryGroups = categoryStats?.reduce((acc: any, issue: any) => {
-        const categoryName = issue.issue_categories.name
-        acc[categoryName] = (acc[categoryName] || 0) + 1
-        return acc
-      }, {}) || {}
-
-      const categoryChartData = Object.entries(categoryGroups).map(([name, count]) => ({
-        name,
-        value: count,
-        count
-      }))
-      setCategoryData(categoryChartData)
-
-      // Status breakdown
-      const statusGroups = (allIssues as any[])?.reduce((acc: any, issue: any) => {
-        acc[issue.status] = (acc[issue.status] || 0) + 1
-        return acc
-      }, {}) || {}
-
-      const statusColors = {
-        pending: '#FEF3C7',
-        in_progress: '#DBEAFE', 
-        resolved: '#D1FAE5',
-        rejected: '#FEE2E2'
-      }
-
-      const statusChartData = Object.entries(statusGroups).map(([status, count]) => ({
-        name: status.replace('_', ' '),
-        value: count,
-        count,
-        color: statusColors[status as keyof typeof statusColors]
-      }))
-      setStatusData(statusChartData)
-
-      // 7-day trends
-      const last7Days = Array.from({length: 7}, (_, i) => {
-        const date = new Date()
-        date.setDate(date.getDate() - i)
-        return date.toISOString().split('T')[0]
-      }).reverse()
-
-      const trendsPromises = last7Days.map(async (date) => {
-        const nextDate = new Date(date)
-        nextDate.setDate(nextDate.getDate() + 1)
-        
-        const { data } = await supabase
-          .from('issues')
-          .select('*')
-          .gte('created_at', date)
-          .lt('created_at', nextDate.toISOString().split('T')[0])
-
-        return {
-          date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          issues: data?.length || 0
-        }
+      setStats({
+        totalUsers: users.length,
+        totalIssues: issues.length,
+        pendingIssues: issues.filter((i: any) => i.status === 'pending').length,
+        resolvedIssues: issues.filter((i: any) => i.status === 'resolved').length
       })
-
-      const trendsResults = await Promise.all(trendsPromises)
-      setTrendsData(trendsResults)
-
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error)
+      console.error('Failed to fetch stats:', error)
+      toast.error('Failed to fetch dashboard data')
     }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('nagarsetu_admin_session')
+    toast.success('Logged out successfully')
+    router.push('/admin/login')
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-300 rounded w-1/4 mb-8"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-gray-300 rounded-lg h-32"></div>
-              ))}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-gray-300 rounded-lg h-80"></div>
-              <div className="bg-gray-300 rounded-lg h-80"></div>
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
-  const COLORS = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899']
+  if (!isAuthenticated) {
+    return null
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600">Overview of civic issues and system performance</p>
+    <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" />
+      
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200 px-4 py-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl font-semibold text-gray-900">Nagarsetu Admin Panel</h1>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-6 space-y-6">
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
+          <h1 className="text-3xl font-bold mb-2">Welcome to Nagarsetu Admin Panel</h1>
+          <p className="text-blue-100">Complete control over your civic issue management system</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <AlertCircle className="h-8 w-8 text-blue-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-500">Total Issues</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.totalIssues}</p>
-                    </div>
-                  </div>
-                </div>
-      
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <Clock className="h-8 w-8 text-yellow-500" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-500">Pending Issues</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.pendingIssues}</p>
-                    </div>
-                  </div>
-                </div>
-      
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <CheckCircle className="h-8 w-8 text-green-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-500">Resolved Issues</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.resolvedIssues}</p>
-                    </div>
-                  </div>
-                </div>
-      
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <TrendingUp className="h-8 w-8 text-purple-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-500">Today's Issues</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.todayIssues}</p>
-                    </div>
-                  </div>
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Users</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
               </div>
-      
-                        {/* Add more dashboard content below as needed */}
-                
+              <div className="bg-blue-100 rounded-full p-3">
+                <Users className="h-6 w-6 text-blue-600" />
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Issues</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalIssues}</p>
+              </div>
+              <div className="bg-purple-100 rounded-full p-3">
+                <FileText className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending Issues</p>
+                <p className="text-3xl font-bold text-yellow-600">{stats.pendingIssues}</p>
+              </div>
+              <div className="bg-yellow-100 rounded-full p-3">
+                <Clock className="h-6 w-6 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Resolved Issues</p>
+                <p className="text-3xl font-bold text-green-600">{stats.resolvedIssues}</p>
+              </div>
+              <div className="bg-green-100 rounded-full p-3">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Links */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <a
+              href="/admin/issues"
+              className="p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-center"
+            >
+              <FileText className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+              <p className="text-sm font-medium">Manage Issues</p>
+            </a>
+            <a
+              href="/admin/users"
+              className="p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-center"
+            >
+              <Users className="h-8 w-8 text-green-600 mx-auto mb-2" />
+              <p className="text-sm font-medium">Manage Users</p>
+            </a>
+            <a
+              href="/admin/logs"
+              className="p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center"
+            >
+              <Clock className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+              <p className="text-sm font-medium">View Logs</p>
+            </a>
+            <button
+              onClick={() => fetchStats()}
+              className="p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors text-center"
+            >
+              <CheckCircle className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+              <p className="text-sm font-medium">Refresh Data</p>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
