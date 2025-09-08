@@ -27,27 +27,43 @@ export function AdminFooter({ className = '' }: AdminFooterProps) {
 
   const fetchStats = async () => {
     try {
-      // Fetch total users
-      const { count: totalUsers } = await supabase
+      // Fetch total users with error handling
+      const { count: totalUsers, error: usersError } = await supabase
         .from('user_profiles')
         .select('*', { count: 'exact', head: true })
 
-      // Fetch total issues
-      const { count: totalIssues } = await supabase
+      if (usersError) {
+        console.warn('Error fetching users:', usersError)
+      }
+
+      // Fetch total issues with error handling
+      const { count: totalIssues, error: issuesError } = await supabase
         .from('issues')
         .select('*', { count: 'exact', head: true })
 
-      // Fetch resolved issues
-      const { count: resolvedIssues } = await supabase
+      if (issuesError) {
+        console.warn('Error fetching issues:', issuesError)
+      }
+
+      // Fetch resolved issues with error handling
+      const { count: resolvedIssues, error: resolvedError } = await supabase
         .from('issues')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'resolved')
 
-      // Fetch pending issues
-      const { count: pendingIssues } = await supabase
+      if (resolvedError) {
+        console.warn('Error fetching resolved issues:', resolvedError)
+      }
+
+      // Fetch pending issues with error handling
+      const { count: pendingIssues, error: pendingError } = await supabase
         .from('issues')
         .select('*', { count: 'exact', head: true })
         .in('status', ['pending', 'in_progress'])
+
+      if (pendingError) {
+        console.warn('Error fetching pending issues:', pendingError)
+      }
 
       setStats({
         totalUsers: totalUsers || 0,
@@ -57,6 +73,13 @@ export function AdminFooter({ className = '' }: AdminFooterProps) {
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
+      // Set fallback values
+      setStats({
+        totalUsers: 0,
+        totalIssues: 0,
+        resolvedIssues: 0,
+        pendingIssues: 0
+      })
     }
   }
 

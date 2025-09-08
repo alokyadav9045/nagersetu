@@ -6,7 +6,7 @@ import { Database } from '@/lib/database.types'
 import { 
   Search, Filter, Eye, Edit, Trash2, Plus, 
   Users, Shield, AlertCircle, Mail, Calendar,
-  MoreHorizontal, UserCheck, UserX
+  MoreHorizontal, UserCheck, UserX, AlertTriangle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'react-hot-toast'
+import Link from 'next/link'
 
 interface UserProfile {
   id: string
@@ -66,7 +67,7 @@ export default function AdminUsers() {
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      let query = supabase
+      let query = (supabase as any)
         .from('user_profiles')
         .select('*')
 
@@ -85,11 +86,39 @@ export default function AdminUsers() {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) {
+        // Handle specific database errors
+        if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+          console.warn('user_profiles table does not exist:', error)
+          toast.error('Database not configured. Please set up user profiles table.')
+          setUsers([])
+          return
+        }
+        
+        if (error.message?.includes('permission denied')) {
+          console.warn('Permission denied accessing user profiles:', error)
+          toast.error('You do not have permission to view user profiles.')
+          setUsers([])
+          return
+        }
+
+        throw error
+      }
+      
       setUsers(data || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching users:', error)
-      toast.error('Failed to fetch users')
+      
+      // Provide user-friendly error messages
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        toast.error('Network error. Please check your connection.')
+      } else if (error.message?.includes('timeout')) {
+        toast.error('Request timed out. Please try again.')
+      } else {
+        toast.error(`Failed to fetch users: ${error.message || 'Unknown error'}`)
+      }
+      
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -97,11 +126,28 @@ export default function AdminUsers() {
 
   const fetchStats = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_profiles')
         .select('role, is_active')
 
-      if (error) throw error
+      if (error) {
+        // Handle database errors gracefully
+        if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+          console.warn('user_profiles table does not exist for stats:', error)
+          // Set default stats when table doesn't exist
+          setStats({
+            total: 0,
+            citizens: 0,
+            admins: 0,
+            moderators: 0,
+            active: 0,
+            inactive: 0
+          })
+          return
+        }
+        
+        throw error
+      }
 
       const stats = data.reduce((acc: any, user: any) => {
         acc.total++
@@ -118,9 +164,9 @@ export default function AdminUsers() {
 
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('user_profiles')
-        .update<Partial<UserProfile>>({ 
+        .update({ 
           role: newRole,
           updated_at: new Date().toISOString()
         })
@@ -139,9 +185,9 @@ export default function AdminUsers() {
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('user_profiles')
-        .update<Partial<UserProfile>>({ 
+        .update({ 
           is_active: !currentStatus,
           updated_at: new Date().toISOString()
         })
@@ -185,10 +231,18 @@ export default function AdminUsers() {
               <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
               <p className="text-gray-600">Manage users, roles, and permissions</p>
             </div>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add New User
-            </Button>
+            <div className="flex items-center gap-2">
+              <Link href="/admin/diagnostic">
+                <Button variant="outline" size="sm">
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Diagnostic
+                </Button>
+              </Link>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add New User
+              </Button>
+            </div>
           </div>
 
       {/* Stats Cards */}

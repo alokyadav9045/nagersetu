@@ -351,7 +351,7 @@ export default function HeroSection() {
             <div className="space-y-4">
               <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight">
                 <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  नागरसेतु
+                  नगरसेतु
                 </span>
                 <br />
                 <span className="text-gray-800">Nagarsetu</span>

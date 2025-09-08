@@ -49,8 +49,30 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     try {
       const [usersResult, issuesResult] = await Promise.all([
-        supabase.from('user_profiles').select('*'),
-        supabase.from('issues').select('*')
+        (supabase as any).from('user_profiles').select('*').then((result: any) => {
+          if (result.error) {
+            // Handle table not existing
+            if (result.error.message?.includes('relation') && result.error.message?.includes('does not exist')) {
+              console.warn('user_profiles table does not exist')
+              return { data: [], error: null }
+            }
+            console.warn('Error fetching users:', result.error)
+            return { data: [], error: result.error }
+          }
+          return result
+        }),
+        (supabase as any).from('issues').select('*').then((result: any) => {
+          if (result.error) {
+            // Handle table not existing
+            if (result.error.message?.includes('relation') && result.error.message?.includes('does not exist')) {
+              console.warn('issues table does not exist')
+              return { data: [], error: null }
+            }
+            console.warn('Error fetching issues:', result.error)
+            return { data: [], error: result.error }
+          }
+          return result
+        })
       ])
 
       const users = usersResult.data || []
@@ -62,9 +84,20 @@ export default function AdminDashboard() {
         pendingIssues: issues.filter((i: any) => i.status === 'pending').length,
         resolvedIssues: issues.filter((i: any) => i.status === 'resolved').length
       })
+
+      // Show warning if database isn't set up
+      if (users.length === 0 && issues.length === 0) {
+        console.warn('Database appears to be empty or not configured')
+      }
     } catch (error) {
       console.error('Failed to fetch stats:', error)
-      toast.error('Failed to fetch dashboard data')
+      // Set fallback values
+      setStats({
+        totalUsers: 0,
+        totalIssues: 0,
+        pendingIssues: 0,
+        resolvedIssues: 0
+      })
     }
   }
 
