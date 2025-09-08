@@ -137,7 +137,7 @@ export default function AdminIssues() {
         .update({ 
           status: newStatus,
           updated_at: new Date().toISOString()
-        })
+        } as any)
         .eq('id', issueId)
 
       if (error) throw error
