@@ -13,6 +13,8 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [selectedStatus, setSelectedStatus] = useState<string>('')
 
+
+  
   useEffect(() => {
     fetchIssues()
     fetchCategories()
