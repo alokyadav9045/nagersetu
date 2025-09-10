@@ -5,52 +5,54 @@ import type { NextRequest } from 'next/server'
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   
-  try {
-    // Create a Supabase client configured to use cookies
-    const supabase = createMiddlewareClient({ req, res })
-
-    // Refresh session if expired - required for Server Components
-    const { data: { session } } = await supabase.auth.getSession()
-
-    // Check if this is an admin route
-    if (req.nextUrl.pathname.startsWith('/admin')) {
-      // If no session, redirect to admin login
-      if (!session) {
-        return NextResponse.redirect(new URL('/admin/login', req.url))
-      }
-
-      // Try to check if user has admin role, but handle errors gracefully
-      try {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
-
-        if (!profile || (profile as any).role !== 'admin') {
-          return NextResponse.redirect(new URL('/admin/login', req.url))
-        }
-      } catch (profileError) {
-        console.warn('Profile check failed in middleware:', profileError)
-        // Continue without blocking if profile check fails (database might not be set up)
-      }
+  // Handle admin routes
+  if (req.nextUrl.pathname.startsWith('/admin')) {
+    // Allow access to admin login page
+    if (req.nextUrl.pathname === '/admin/login') {
+      return res
     }
 
-    // Protected routes that require authentication
-    const protectedRoutes = ['/report', '/my-issues', '/profile']
+    // Check for admin authentication
+    const adminToken = req.cookies.get('adminToken')?.value
     
-    if (protectedRoutes.some(route => req.nextUrl.pathname.startsWith(route))) {
-      if (!session) {
-        return NextResponse.redirect(new URL('/login', req.url))
-      }
+    if (!adminToken) {
+      return NextResponse.redirect(new URL('/admin/login', req.url))
     }
 
-    return res
-  } catch (error) {
-    console.error('Middleware error:', error)
-    // Continue without blocking if there's a general error
-    return res
+    // Verify admin token (basic check)
+    try {
+      const tokenData = JSON.parse(atob(adminToken.split('.')[1]))
+      const isExpired = Date.now() >= tokenData.exp * 1000
+      
+      if (isExpired) {
+        const response = NextResponse.redirect(new URL('/admin/login', req.url))
+        response.cookies.delete('adminToken')
+        return response
+      }
+    } catch (error) {
+      return NextResponse.redirect(new URL('/admin/login', req.url))
+    }
   }
+
+  // Handle protected user routes
+  if (req.nextUrl.pathname.startsWith('/report') || 
+      req.nextUrl.pathname.startsWith('/my-issues') ||
+      req.nextUrl.pathname.startsWith('/profile')) {
+    
+    try {
+      const supabase = createMiddlewareClient({ req, res })
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        return NextResponse.redirect(new URL('/?auth=login', req.url))
+      }
+    } catch (error) {
+      console.error('Middleware auth error:', error)
+      return NextResponse.redirect(new URL('/?auth=login', req.url))
+    }
+  }
+
+  return res
 }
 
 export const config = {
