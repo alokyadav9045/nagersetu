@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { toast } from 'react-hot-toast'
 import { 
   MapPin, Calendar, User, ThumbsUp, ThumbsDown, MessageCircle, 
@@ -69,20 +69,25 @@ export default function IssueDetailPage() {
   const [showResolutionModal, setShowResolutionModal] = useState(false)
   const [resolutionNote, setResolutionNote] = useState('')
 
-  useEffect(() => {
-    if (params.id) {
-      initializePage()
-    }
-  }, [params.id])
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
-  const initializePage = async () => {
+  const initializePage = useCallback(async () => {
     await Promise.all([
       fetchIssue(),
       fetchComments(),
       getUser()
     ])
     setLoading(false)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (params.id) {
+      initializePage()
+    }
+  }, [params.id, initializePage])
 
   const getUser = async () => {
     try {
@@ -119,7 +124,7 @@ export default function IssueDetailPage() {
   const fetchIssue = async () => {
     try {
       const { data, error } = await supabase
-        .from<Issue>('issues')
+        .from('issues')
         .select(`
           *,
           issue_categories (name, color, icon),
@@ -141,7 +146,7 @@ export default function IssueDetailPage() {
   const fetchComments = async () => {
     try {
       const { data, error } = await supabase
-        .from<Comment>('issue_comments')
+        .from('issue_comments')
         .select(`
           *,
           user_profiles (full_name, role)
@@ -191,7 +196,7 @@ export default function IssueDetailPage() {
       else if (userVote) {
         await supabase
           .from('issue_votes')
-          .update<{ vote_type: 'upvote' | 'downvote' }>({ vote_type: voteType })
+          .update({ vote_type: voteType })
           .eq('issue_id', String(params.id))
           .eq('user_id', user.id)
         
@@ -209,7 +214,7 @@ export default function IssueDetailPage() {
       else {
         await supabase
           .from('issue_votes')
-          .insert<{ issue_id: string; user_id: string; vote_type: 'upvote' | 'downvote' }>([{
+          .insert([{
             issue_id: String(params.id),
             user_id: user.id,
             vote_type: voteType
@@ -226,7 +231,7 @@ export default function IssueDetailPage() {
       // Update issue vote counts in database
       await supabase
         .from('issues')
-        .update<{ upvotes: number; downvotes: number }>({ 
+        .update({ 
           upvotes: newUpvotes, 
           downvotes: newDownvotes 
         })
@@ -240,7 +245,7 @@ export default function IssueDetailPage() {
       } : null)
       setUserVote(newUserVote)
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to vote:', error)
       toast.error('Failed to vote. Please try again.')
     } finally {
@@ -257,7 +262,7 @@ export default function IssueDetailPage() {
     try {
       const { data, error } = await supabase
         .from('issue_comments')
-        .insert<{ issue_id: string; user_id: string; comment: string }>([{
+        .insert([{
           issue_id: String(params.id),
           user_id: user.id,
           comment: newComment.trim()
@@ -273,7 +278,7 @@ export default function IssueDetailPage() {
       setComments(prev => [...prev, data as Comment])
       setNewComment('')
       toast.success('Comment added successfully!')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to add comment:', error)
       toast.error('Failed to add comment. Please try again.')
     } finally {
@@ -302,7 +307,7 @@ export default function IssueDetailPage() {
 
       const { error } = await supabase
         .from('issues')
-        .update<Issue>(updates)
+        .update(updates)
         .eq('id', String(params.id))
 
       if (error) throw error
@@ -311,7 +316,7 @@ export default function IssueDetailPage() {
       toast.success('Issue status updated successfully!')
       setShowResolutionModal(false)
       setResolutionNote('')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update status:', error)
       toast.error('Failed to update status. Please try again.')
     }
@@ -434,9 +439,11 @@ export default function IssueDetailPage() {
           {issue.images && issue.images.length > 0 && (
             <div className="relative">
               <div className="h-64 md:h-80 overflow-hidden">
-                <img
+                <Image
                   src={issue.images[currentImageIndex]}
                   alt={issue.title}
+                  width={800}
+                  height={320}
                   className="w-full h-full object-cover"
                 />
               </div>
