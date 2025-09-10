@@ -8,10 +8,25 @@ import {
   Shield, Activity, CheckCircle, Clock, AlertTriangle 
 } from 'lucide-react'
 
+interface UserProfile {
+  id: string
+  email: string
+  full_name?: string
+  phone?: string
+  address?: string
+  role?: string
+  created_at: string
+  updated_at: string
+}
+
+interface Issue {
+  status: string
+}
+
 export default function ProfilePage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<any>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -52,15 +67,41 @@ export default function ProfilePage() {
         .from('user_profiles')
         .select('*')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
 
       if (profileData) {
-        setProfile(profileData)
+        setProfile(profileData as UserProfile)
         setFormData({
-          full_name: profileData.full_name || '',
-          phone: profileData.phone || '',
-          address: profileData.address || ''
+          full_name: (profileData as UserProfile).full_name || '',
+          phone: (profileData as UserProfile).phone || '',
+          address: (profileData as UserProfile).address || ''
         })
+      } else {
+        // Profile doesn't exist, create one
+        const newProfile: UserProfile = {
+          id: user.id,
+          email: user.email || '',
+          role: 'citizen',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+
+        const { data: createdProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert(newProfile as any)
+          .select()
+          .single()
+
+        if (createdProfile && !createError) {
+          setProfile(createdProfile as UserProfile)
+          setFormData({
+            full_name: '',
+            phone: '',
+            address: ''
+          })
+        } else {
+          console.error('Failed to create profile:', createError)
+        }
       }
 
       // Get user stats
@@ -71,8 +112,8 @@ export default function ProfilePage() {
 
       if (issuesData) {
         const total = issuesData.length
-        const resolved = issuesData.filter(issue => issue.status === 'resolved').length
-        const pending = issuesData.filter(issue => issue.status === 'pending').length
+        const resolved = (issuesData as Issue[]).filter(issue => issue.status === 'resolved').length
+        const pending = (issuesData as Issue[]).filter(issue => issue.status === 'pending').length
 
         setStats({
           totalIssues: total,
@@ -91,19 +132,26 @@ export default function ProfilePage() {
     setSaving(true)
     
     try {
+      const updateData = {
+        full_name: formData.full_name,
+        phone: formData.phone,
+        address: formData.address,
+        updated_at: new Date().toISOString()
+      }
+
       const { error } = await supabase
         .from('user_profiles')
-        .update({
-          full_name: formData.full_name,
-          phone: formData.phone,
-          address: formData.address,
-          updated_at: new Date().toISOString()
-        })
+        // @ts-ignore - Supabase type generation issue
+        .update(updateData)
         .eq('id', user.id)
 
       if (error) throw error
 
-      setProfile(prev => ({ ...prev, ...formData }))
+      setProfile(prev => prev ? { 
+        ...prev, 
+        ...formData,
+        updated_at: new Date().toISOString()
+      } : null)
       setEditing(false)
       toast.success('Profile updated successfully!')
     } catch (error: any) {

@@ -5,8 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { toast } from 'react-hot-toast'
 import { 
   MapPin, Calendar, User, ThumbsUp, ThumbsDown, MessageCircle, 
-  Send, CheckCircle, XCircle, Clock, AlertTriangle, ArrowLeft,
-  Edit, Trash2, Flag, Share2
+  Send, CheckCircle, XCircle, Clock, AlertTriangle, ArrowLeft, Share2
 } from 'lucide-react'
 import Image from 'next/image'
 
@@ -58,8 +57,8 @@ export default function IssueDetailPage() {
   const router = useRouter()
   const [issue, setIssue] = useState<Issue | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
-  const [user, setUser] = useState<any>(null)
-  const [userProfile, setUserProfile] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
+  const [userProfile, setUserProfile] = useState<{ role: string; full_name?: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [newComment, setNewComment] = useState('')
   const [userVote, setUserVote] = useState<'upvote' | 'downvote' | null>(null)
@@ -74,29 +73,14 @@ export default function IssueDetailPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const initializePage = useCallback(async () => {
-    await Promise.all([
-      fetchIssue(),
-      fetchComments(),
-      getUser()
-    ])
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    if (params.id) {
-      initializePage()
-    }
-  }, [params.id, initializePage])
-
-  const getUser = async () => {
+  const getUser = useCallback(async () => {
     try {
-      const { data: { user }, error } = await supabase.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUser(user)
         
         // Get user profile
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('user_profiles')
           .select('*')
           .eq('id', user.id)
@@ -106,7 +90,7 @@ export default function IssueDetailPage() {
         
         // Get user's vote on this issue
         if (params.id) {
-          const { data: vote, error: voteError } = await supabase
+          const { data: vote } = await supabase
             .from('issue_votes')
             .select('vote_type')
             .eq('issue_id', params.id)
@@ -119,9 +103,9 @@ export default function IssueDetailPage() {
     } catch (error) {
       console.error('User fetch failed:', error)
     }
-  }
+  }, [params.id, supabase])
 
-  const fetchIssue = async () => {
+  const fetchIssue = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('issues')
@@ -141,9 +125,9 @@ export default function IssueDetailPage() {
       toast.error('Issue not found')
       router.push('/')
     }
-  }
+  }, [params.id, supabase, router])
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('issue_comments')
@@ -159,7 +143,22 @@ export default function IssueDetailPage() {
     } catch (error) {
       console.error('Failed to fetch comments:', error)
     }
-  }
+  }, [params.id, supabase])
+
+  const initializePage = useCallback(async () => {
+    await Promise.all([
+      fetchIssue(),
+      fetchComments(),
+      getUser()
+    ])
+    setLoading(false)
+  }, [fetchIssue, fetchComments, getUser])
+
+  useEffect(() => {
+    if (params.id) {
+      initializePage()
+    }
+  }, [params.id, initializePage])
 
   const handleVote = async (voteType: 'upvote' | 'downvote') => {
     if (!user) {
@@ -295,7 +294,12 @@ export default function IssueDetailPage() {
     if (!issue) return
 
     try {
-      const updates: any = { 
+      const updates: {
+        status: Issue['status'];
+        updated_at: string;
+        resolved_at?: string;
+        resolution_note?: string;
+      } = { 
         status,
         updated_at: new Date().toISOString()
       }
@@ -371,7 +375,7 @@ export default function IssueDetailPage() {
           text: issue?.description,
           url: url,
         })
-      } catch (error) {
+      } catch {
         console.log('Share cancelled')
       }
     } else {
@@ -379,7 +383,7 @@ export default function IssueDetailPage() {
       try {
         await navigator.clipboard.writeText(url)
         toast.success('Issue link copied to clipboard!')
-      } catch (error) {
+      } catch {
         toast.error('Failed to copy link')
       }
     }
@@ -408,7 +412,7 @@ export default function IssueDetailPage() {
         <div className="text-center">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Issue Not Found</h2>
-          <p className="text-gray-600 mb-6">The issue you're looking for doesn't exist or has been removed.</p>
+          <p className="text-gray-600 mb-6">The issue you&apos;re looking for doesn&apos;t exist or has been removed.</p>
           <button
             onClick={() => router.push('/')}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
