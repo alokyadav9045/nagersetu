@@ -10,6 +10,7 @@ import {
   XCircle, Activity, ThumbsUp 
 } from 'lucide-react'
 
+
 interface Issue {
   id: string
   title: string
