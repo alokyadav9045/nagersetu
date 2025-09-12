@@ -28,10 +28,13 @@ export function AdminNavbar({ className = '' }: AdminNavbarProps) {
   const [notifications, setNotifications] = useState(3) // Mock notification count
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/logout', { method: 'POST' })
+    } catch {}
     localStorage.removeItem('nagarsetu_admin_session')
     toast.success('Logged out successfully')
-    router.push('/admin/login')
+    router.push('/')
   }
 
   const navigation = [

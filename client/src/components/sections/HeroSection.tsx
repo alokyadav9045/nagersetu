@@ -188,7 +188,7 @@ const InteractiveVideoCard = () => {
             onCanPlay={() => setIsLoading(false)}
             playsInline
             muted={isMuted}
-            poster="/api/placeholder/600/300"
+            poster="/vidimg.avif"
           >
             <source src="/nagrsetu.mp4" type="video/mp4" />
             Your browser does not support the video tag.

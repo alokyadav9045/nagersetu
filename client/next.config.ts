@@ -1,11 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    turbo: {
-      rules: {
-        // Turbopack config if needed
-      },
+  turbopack: {
+    rules: {
+      // Turbopack config if needed
     },
   },
   images: {
@@ -18,15 +16,6 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
-  },
-  async redirects() {
-    return [
-      {
-        source: "/admin",
-        destination: "/admin/login",
-        permanent: false,
-      },
-    ];
   },
   // Remove build error ignoring for production
   typescript: {

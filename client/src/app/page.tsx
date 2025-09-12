@@ -190,9 +190,9 @@ export default function Home() {
                         <div className="flex items-center space-x-2">
                           <div
                             className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: issue.issue_categories.color }}
+                            style={{ backgroundColor: issue.issue_categories?.color || '#9CA3AF' }}
                           ></div>
-                          <span>{issue.issue_categories.name}</span>
+                          <span>{issue.issue_categories?.name || 'Uncategorized'}</span>
                           <span className={`ml-auto font-medium ${getPriorityColor(issue.priority)}`}>
                             {issue.priority} priority
                           </span>

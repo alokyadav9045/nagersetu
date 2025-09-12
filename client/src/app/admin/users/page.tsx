@@ -157,8 +157,11 @@ export default function AdminUsers() {
       }, { total: 0, citizens: 0, admins: 0, moderators: 0, active: 0, inactive: 0 })
 
       setStats(stats)
-    } catch (error) {
-      console.error('Error fetching stats:', error)
+    } catch (error: any) {
+      console.error('Admin Users stats error:', {
+        message: error?.message || String(error),
+        stack: error?.stack || null
+      })
     }
   }
 

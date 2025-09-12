@@ -1,33 +1,18 @@
-'use client'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import Navbar from '@/components/layout/Navbar'
-import Footer from '@/components/layout/Footer'
-import { Toaster } from 'react-hot-toast'
-import ErrorHandler from '@/components/ErrorBoundary'
-import { usePathname } from 'next/navigation'
+import AppFrame from '@/components/layout/AppFrame'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  display: 'swap',
+})
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const pathname = usePathname()
-  const isAdminRoute = pathname?.startsWith('/admin') || false
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={inter.className}>
-        {!isAdminRoute && <Navbar />}
-        <ErrorHandler>
-          <main className="min-h-screen">
-            {children}
-          </main>
-        </ErrorHandler>
-        {!isAdminRoute && <Footer />}
-        <Toaster position="top-right" />
+        <AppFrame>{children}</AppFrame>
       </body>
     </html>
   )

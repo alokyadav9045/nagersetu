@@ -19,59 +19,61 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchStats()
-    const interval = setInterval(fetchStats, 30000) // Refresh every 30 seconds
-    return () => clearInterval(interval)
+    const run = async () => {
+      await fetchStats()
+    }
+    run()
+    const interval = setInterval(run, 30000) // Refresh every 30 seconds
+    return () => {
+      clearInterval(interval)
+    }
   }, [])
 
   const fetchStats = async () => {
     try {
-      // Fetch total users
-      const { count: totalUsers } = await supabase
-        .from('user_profiles')
-        .select('*', { count: 'exact', head: true })
-
-      // Fetch total issues
-      const { count: totalIssues } = await supabase
-        .from('issues')
-        .select('*', { count: 'exact', head: true })
-
-      // Fetch pending issues
-      const { count: pendingIssues } = await supabase
-        .from('issues')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['pending', 'in_progress'])
-
-      // Fetch resolved issues
-      const { count: resolvedIssues } = await supabase
-        .from('issues')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'resolved')
-
-      // Fetch today's issues
       const today = new Date().toISOString().split('T')[0]
-      const { count: todayIssues } = await supabase
-        .from('issues')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', today)
-
-      // Fetch active users (users who logged in within last 7 days)
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-      const { count: activeUsers } = await supabase
-        .from('user_profiles')
-        .select('*', { count: 'exact', head: true })
-        .gte('updated_at', weekAgo)
+
+      const queries = [
+        supabase.from('user_profiles').select('id', { count: 'exact', head: true }),
+        supabase.from('issues').select('id', { count: 'exact', head: true }),
+        supabase.from('issues').select('id', { count: 'exact', head: true }).in('status', ['pending', 'in_progress']),
+        supabase.from('issues').select('id', { count: 'exact', head: true }).eq('status', 'resolved'),
+        supabase.from('issues').select('id', { count: 'exact', head: true }).gte('created_at', today),
+        supabase.from('user_profiles').select('id', { count: 'exact', head: true }).gte('updated_at', weekAgo)
+      ]
+
+      const [usersRes, issuesRes, pendingRes, resolvedRes, todayRes, activeRes] = await Promise.allSettled(queries)
+
+      const safeCount = (res: any, label: string) => {
+        if (res.status === 'fulfilled') {
+          const { error, count } = res.value
+          if (error) {
+            const msg = typeof error?.message === 'string' ? error.message : JSON.stringify(error)
+            console.warn(`Admin Dashboard ${label} count error:`, msg)
+          }
+          return count || 0
+        } else {
+          const reason = res.reason
+          const msg = typeof reason?.message === 'string' ? reason.message : JSON.stringify(reason)
+          console.warn(`Admin Dashboard ${label} count failed:`, msg)
+          return 0
+        }
+      }
 
       setStats({
-        totalUsers: totalUsers || 0,
-        totalIssues: totalIssues || 0,
-        pendingIssues: pendingIssues || 0,
-        resolvedIssues: resolvedIssues || 0,
-        todayIssues: todayIssues || 0,
-        activeUsers: activeUsers || 0
+        totalUsers: safeCount(usersRes, 'users'),
+        totalIssues: safeCount(issuesRes, 'issues'),
+        pendingIssues: safeCount(pendingRes, 'pending'),
+        resolvedIssues: safeCount(resolvedRes, 'resolved'),
+        todayIssues: safeCount(todayRes, 'today'),
+        activeUsers: safeCount(activeRes, 'active')
       })
-    } catch (error) {
-      console.error('Error fetching stats:', error)
+    } catch (error: any) {
+      console.error('Admin Dashboard fatal stats error:', {
+        message: error?.message || String(error),
+        stack: error?.stack || null
+      })
     } finally {
       setLoading(false)
     }

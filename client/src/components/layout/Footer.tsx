@@ -245,10 +245,10 @@ export default function Footer() {
                   For urgent civic emergencies requiring immediate attention
                 </p>
                 <a 
-                  href="tel:100" 
+                  href="tel:112" 
                   className="text-red-400 font-bold hover:text-red-300 transition-colors"
                 >
-                  📞 Emergency Hotline: 100
+                  📞 Emergency Hotline: 112
                 </a>
               </div>
             </div>

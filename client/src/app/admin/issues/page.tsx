@@ -275,8 +275,13 @@ export default function AdminIssues() {
           })
           return
         }
-        
-        console.error('Error fetching stats:', error)
+        console.error('Admin Issues stats query error:', {
+          message: (error as any)?.message || String(error),
+          details: (error as any)?.details || null,
+          hint: (error as any)?.hint || null,
+          code: (error as any)?.code || null
+        })
+        setStats({ total: 0, pending: 0, in_progress: 0, resolved: 0, rejected: 0 })
         return
       }
 
@@ -290,8 +295,11 @@ export default function AdminIssues() {
       }, { total: 0, pending: 0, in_progress: 0, resolved: 0, rejected: 0 })
 
       setStats(statsData || { total: 0, pending: 0, in_progress: 0, resolved: 0, rejected: 0 })
-    } catch (error) {
-      console.error('Error fetching stats:', error)
+    } catch (error: any) {
+      console.error('Admin Issues stats error:', {
+        message: error?.message || String(error),
+        stack: error?.stack || null
+      })
     }
   }
 

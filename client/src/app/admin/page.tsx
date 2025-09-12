@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Users, FileText, CheckCircle, Clock } from 'lucide-react'
@@ -7,7 +7,7 @@ import { Toaster, toast } from 'react-hot-toast'
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(true)
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalIssues: 0,
@@ -16,35 +16,20 @@ export default function AdminDashboard() {
   })
   const [loading, setLoading] = useState(true)
 
+  // Middleware enforces access with httpOnly cookie; once rendered we can fetch
+  // stats without performing client-side redirects here to avoid loops.
+  // Mark loading complete immediately and let middleware gate access.
+  // Fetch stats below.
+  
   useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = () => {
-    const adminSession = localStorage.getItem('nagarsetu_admin_session')
-    if (adminSession) {
-      try {
-        const session = JSON.parse(adminSession)
-        const now = new Date().getTime()
-        const sessionTime = new Date(session.timestamp).getTime()
-        const hoursDiff = (now - sessionTime) / (1000 * 60 * 60)
-        
-        if (hoursDiff < 24) {
-          setIsAuthenticated(true)
-          fetchStats()
-        } else {
-          localStorage.removeItem('nagarsetu_admin_session')
-          router.push('/admin/login')
-        }
-      } catch (error) {
-        localStorage.removeItem('nagarsetu_admin_session')
-        router.push('/admin/login')
-      }
-    } else {
-      router.push('/admin/login')
+    let mounted = true
+    fetchStats().finally(() => {
+      if (mounted) setLoading(false)
+    })
+    return () => {
+      mounted = false
     }
-    setLoading(false)
-  }
+  }, [])
 
   const fetchStats = async () => {
     try {
@@ -107,7 +92,7 @@ export default function AdminDashboard() {
     } catch {}
     localStorage.removeItem('nagarsetu_admin_session')
     toast.success('Logged out successfully')
-    router.push('/admin/login')
+  router.push('/')
   }
 
   if (loading) {

@@ -20,59 +20,56 @@ export function AdminFooter({ className = '' }: AdminFooterProps) {
   })
 
   useEffect(() => {
-    fetchStats()
-    const interval = setInterval(fetchStats, 30000) // Update every 30 seconds
-    return () => clearInterval(interval)
+    const run = async () => {
+      await fetchStats()
+    }
+
+    run()
+    const interval = setInterval(run, 30000) // Update every 30 seconds
+    return () => {
+      clearInterval(interval)
+    }
   }, [])
 
   const fetchStats = async () => {
     try {
-      // Fetch total users with error handling
-      const { count: totalUsers, error: usersError } = await supabase
-        .from('user_profiles')
-        .select('*', { count: 'exact', head: true })
+      const queries = [
+        supabase.from('user_profiles').select('id', { count: 'exact', head: true }),
+        supabase.from('issues').select('id', { count: 'exact', head: true }),
+        supabase.from('issues').select('id', { count: 'exact', head: true }).eq('status', 'resolved'),
+        supabase.from('issues').select('id', { count: 'exact', head: true }).in('status', ['pending', 'in_progress'])
+      ]
 
-      if (usersError) {
-        console.warn('Error fetching users:', usersError)
-      }
+      const [usersRes, issuesRes, resolvedRes, pendingRes] = await Promise.allSettled(queries)
 
-      // Fetch total issues with error handling
-      const { count: totalIssues, error: issuesError } = await supabase
-        .from('issues')
-        .select('*', { count: 'exact', head: true })
-
-      if (issuesError) {
-        console.warn('Error fetching issues:', issuesError)
-      }
-
-      // Fetch resolved issues with error handling
-      const { count: resolvedIssues, error: resolvedError } = await supabase
-        .from('issues')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'resolved')
-
-      if (resolvedError) {
-        console.warn('Error fetching resolved issues:', resolvedError)
-      }
-
-      // Fetch pending issues with error handling
-      const { count: pendingIssues, error: pendingError } = await supabase
-        .from('issues')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['pending', 'in_progress'])
-
-      if (pendingError) {
-        console.warn('Error fetching pending issues:', pendingError)
+      const safeCount = (res: any, label: string) => {
+        if (res.status === 'fulfilled') {
+          const { error, count } = res.value
+          if (error) {
+            const msg = typeof error?.message === 'string' ? error.message : JSON.stringify(error)
+            console.warn(`AdminFooter ${label} count error:`, msg)
+          }
+          return count || 0
+        } else {
+          const reason = res.reason
+          const msg = typeof reason?.message === 'string' ? reason.message : JSON.stringify(reason)
+          console.warn(`AdminFooter ${label} count failed:`, msg)
+          return 0
+        }
       }
 
       setStats({
-        totalUsers: totalUsers || 0,
-        totalIssues: totalIssues || 0,
-        resolvedIssues: resolvedIssues || 0,
-        pendingIssues: pendingIssues || 0
+        totalUsers: safeCount(usersRes, 'users'),
+        totalIssues: safeCount(issuesRes, 'issues'),
+        resolvedIssues: safeCount(resolvedRes, 'resolved'),
+        pendingIssues: safeCount(pendingRes, 'pending')
       })
     } catch (error) {
-      console.error('Error fetching stats:', error)
+      const err = error as any
+      console.error('AdminFooter fatal stats error:', {
+        message: err?.message || String(err),
+        stack: err?.stack || null
+      })
       // Set fallback values
       setStats({
         totalUsers: 0,

@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'react-hot-toast'
-import { MapPin, Upload, X, Camera, AlertTriangle, CheckCircle } from 'lucide-react'
+import { MapPin, Upload, X, Camera, AlertTriangle, CheckCircle, Droplets, Route, Zap, Trash2, Shield, MoreHorizontal } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Category {
   id: number
@@ -12,6 +13,16 @@ interface Category {
   icon: string
   color: string
 }
+
+// Default categories used when the database table is missing or empty
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: 1, name: 'Water Supply', description: 'Water related issues', icon: 'droplets', color: 'blue' },
+  { id: 2, name: 'Roads & Infrastructure', description: 'Road and infrastructure issues', icon: 'road', color: 'gray' },
+  { id: 3, name: 'Electricity', description: 'Power and electrical issues', icon: 'zap', color: 'yellow' },
+  { id: 4, name: 'Waste Management', description: 'Garbage and cleanliness', icon: 'trash-2', color: 'green' },
+  { id: 5, name: 'Public Safety', description: 'Safety and security concerns', icon: 'shield', color: 'red' },
+  { id: 6, name: 'Other', description: 'Other civic issues', icon: 'more-horizontal', color: 'gray' }
+]
 
 interface FormData {
   title: string
@@ -27,6 +38,8 @@ export default function ReportIssuePage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [categories, setCategories] = useState<Category[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState<boolean>(true)
+  const [dbCategoriesAvailable, setDbCategoriesAvailable] = useState<boolean>(false)
   const [loading, setLoading] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
@@ -116,18 +129,15 @@ export default function ReportIssuePage() {
         throw new Error('User ID mismatch - security violation')
       }
 
-      // Query user profile with comprehensive fields
+      // Query user profile with comprehensive fields (array + limit(1) to avoid 406 on no rows)
       const { data, error } = await supabase
         .from('user_profiles')
         .select('id, role, full_name, email, phone, address, created_at, updated_at')
         .eq('id', userId)
-        .single()
+        .limit(1)
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          console.warn('User profile not found for user:', userId)
-          return null // Profile doesn't exist
-        } else if (error.message.includes('relation "user_profiles" does not exist')) {
+        if (error.message.includes('relation "user_profiles" does not exist')) {
           console.warn('user_profiles table does not exist')
           throw new Error('Database not fully configured. Please contact support.')
         }
@@ -135,8 +145,13 @@ export default function ReportIssuePage() {
         throw error
       }
 
-      console.log('User profile fetched successfully:', data)
-      return data
+      const profile = Array.isArray(data) && data.length > 0 ? data[0] : null
+      if (!profile) {
+        console.warn('User profile not found for user:', userId)
+        return null
+      }
+      console.log('User profile fetched successfully:', profile)
+      return profile
     } catch (error) {
       console.error('Failed to fetch user profile:', error)
       throw error
@@ -233,6 +248,7 @@ export default function ReportIssuePage() {
 
   // Fetch issue categories
   const fetchCategories = async () => {
+    setCategoriesLoading(true)
     try {
       const { data, error } = await supabase
         .from('issue_categories')
@@ -245,34 +261,31 @@ export default function ReportIssuePage() {
         // If the table doesn't exist, provide default categories
         if (error.code === '42P01' || error.message.includes('does not exist')) {
           console.log('Categories table does not exist, using default categories')
-          setCategories([
-            { id: 1, name: 'Water Supply', description: 'Water related issues', icon: 'droplets', color: 'blue' },
-            { id: 2, name: 'Roads & Infrastructure', description: 'Road and infrastructure issues', icon: 'road', color: 'gray' },
-            { id: 3, name: 'Electricity', description: 'Power and electrical issues', icon: 'zap', color: 'yellow' },
-            { id: 4, name: 'Waste Management', description: 'Garbage and cleanliness', icon: 'trash-2', color: 'green' },
-            { id: 5, name: 'Public Safety', description: 'Safety and security concerns', icon: 'shield', color: 'red' },
-            { id: 6, name: 'Other', description: 'Other civic issues', icon: 'more-horizontal', color: 'gray' }
-          ])
+          setCategories(DEFAULT_CATEGORIES)
+          setDbCategoriesAvailable(false)
           toast.error('Database not fully set up. Using default categories.')
           return
         }
         
         throw error
       }
-      setCategories(data || [])
+      if (data && data.length > 0) {
+        setCategories(data)
+        setDbCategoriesAvailable(true)
+      } else {
+        console.log('No categories found in database, using defaults')
+        setCategories(DEFAULT_CATEGORIES)
+        setDbCategoriesAvailable(false)
+      }
     } catch (error) {
       console.error('Failed to fetch categories:', error)
       toast.error('Failed to load categories. Using defaults.')
       
       // Provide fallback categories
-      setCategories([
-        { id: 1, name: 'Water Supply', description: 'Water related issues', icon: 'droplets', color: 'blue' },
-        { id: 2, name: 'Roads & Infrastructure', description: 'Road and infrastructure issues', icon: 'road', color: 'gray' },
-        { id: 3, name: 'Electricity', description: 'Power and electrical issues', icon: 'zap', color: 'yellow' },
-        { id: 4, name: 'Waste Management', description: 'Garbage and cleanliness', icon: 'trash-2', color: 'green' },
-        { id: 5, name: 'Public Safety', description: 'Safety and security concerns', icon: 'shield', color: 'red' },
-        { id: 6, name: 'Other', description: 'Other civic issues', icon: 'more-horizontal', color: 'gray' }
-      ])
+      setCategories(DEFAULT_CATEGORIES)
+      setDbCategoriesAvailable(false)
+    } finally {
+      setCategoriesLoading(false)
     }
   }
 
@@ -529,10 +542,11 @@ export default function ReportIssuePage() {
       // First, ensure user profile exists
       await ensureUserProfile()
 
+      const categoryIdToSend = dbCategoriesAvailable ? parseInt(formData.category_id) : null
       const issueData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
-        category_id: parseInt(formData.category_id),
+        category_id: categoryIdToSend,
         priority: formData.priority,
         location_address: formData.location_address.trim(),
         location_lat: formData.location_lat,
@@ -576,6 +590,25 @@ export default function ReportIssuePage() {
         }
 
         // Handle foreign key constraint violation
+        if (error.code === '23503' && error.message.includes('issue_categories')) {
+          toast.error('Categories are not configured in the database. Issue saved locally; please seed categories and submit pending.')
+          localStorage.setItem(`pending_issue_${Date.now()}`, JSON.stringify(issueData))
+          setPendingIssuesCount(prev => prev + 1)
+          // Reset form
+          setFormData({
+            title: '',
+            description: '',
+            category_id: '',
+            priority: 'medium',
+            location_address: '',
+            location_lat: null,
+            location_lng: null
+          })
+          setImages([])
+          setErrors({})
+          return
+        }
+
         if (error.code === '23503' && error.message.includes('citizen_id_fkey')) {
           toast.error('User profile error. Please contact support.')
           console.warn('Foreign key constraint violation - user profile missing:', error)
@@ -648,6 +681,8 @@ export default function ReportIssuePage() {
         }
       } else if (error.code === '23502') {
         toast.error('Missing required fields. Please fill in all required information.')
+      } else if (error.code === '42501' || (typeof error.message === 'string' && error.message.includes('row-level security'))) {
+        toast.error('Your account does not have permission to create issues. Please contact admin or fix RLS policies.')
       } else if (error.message.includes('permission denied') || error.message.includes('authentication')) {
         toast.error('You do not have permission to create issues. Please check your account status.')
       } else if (error.message.includes('network') || error.message.includes('fetch')) {
@@ -752,6 +787,26 @@ export default function ReportIssuePage() {
     )
   }
 
+  function renderCategoryIcon(cat: { icon: string }) {
+    const cls = 'h-4 w-4'
+    switch (cat.icon) {
+      case 'droplets':
+        return <Droplets className={cls} />
+      case 'road':
+        return <Route className={cls} />
+      case 'zap':
+        return <Zap className={cls} />
+      case 'trash-2':
+        return <Trash2 className={cls} />
+      case 'shield':
+        return <Shield className={cls} />
+      case 'more-horizontal':
+        return <MoreHorizontal className={cls} />
+      default:
+        return <AlertTriangle className={cls} />
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -787,20 +842,36 @@ export default function ReportIssuePage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category <span className="text-red-500">*</span>
               </label>
-              <select
-                required
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  errors.category_id ? 'border-red-500' : 'border-gray-300'
-                }`}
+              <Select
                 value={formData.category_id}
-                onChange={(e) => handleInputChange('category_id', e.target.value)}
+                onValueChange={(val) => handleInputChange('category_id', val)}
+                disabled={categoriesLoading}
+                required
               >
-                <option value="">Select a category</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
-                ))}
-              </select>
+                <SelectTrigger className={`${errors.category_id ? 'border-red-500' : ''}`}>
+                  <SelectValue placeholder={categoriesLoading ? 'Loading categories…' : 'Select a category'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id.toString()}>
+                      <span className="inline-flex items-center gap-2">
+                        {renderCategoryIcon(cat)}
+                        {cat.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {errors.category_id && <p className="text-red-500 text-sm mt-1">{errors.category_id}</p>}
+              {formData.category_id && (() => {
+                const selected = categories.find(c => c.id.toString() === formData.category_id)
+                return selected ? (
+                  <div className="mt-2 text-sm text-gray-600 flex items-start gap-2">
+                    {renderCategoryIcon(selected)}
+                    <span>{selected.description}</span>
+                  </div>
+                ) : null
+              })()}
             </div>
 
             {/* Priority */}

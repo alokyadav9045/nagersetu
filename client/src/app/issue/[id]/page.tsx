@@ -500,16 +500,16 @@ export default function IssueDetailPage() {
                   <div className="flex items-center space-x-2">
                     <div
                       className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: issue.issue_categories.color }}
+                      style={{ backgroundColor: issue.issue_categories?.color || '#9CA3AF' }}
                     ></div>
-                    <span className="text-sm text-gray-600">{issue.issue_categories.name}</span>
+                    <span className="text-sm text-gray-600">{issue.issue_categories?.name || 'Uncategorized'}</span>
                   </div>
                 </div>
 
                 <div className="space-y-2 text-sm text-gray-500">
                   <div className="flex items-center space-x-2">
                     <User className="h-4 w-4" />
-                    <span>Reported by {issue.user_profiles.full_name}</span>
+                    <span>Reported by {issue.user_profiles?.full_name || 'Anonymous'}</span>
                   </div>
                   
                   <div className="flex items-center space-x-2">

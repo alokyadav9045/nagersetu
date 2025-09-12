@@ -305,9 +305,9 @@ export default function MyIssuesPage() {
                           <div className="flex items-center space-x-1">
                             <div
                               className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: issue.issue_categories.color }}
+                              style={{ backgroundColor: issue.issue_categories?.color || '#9CA3AF' }}
                             ></div>
-                            <span>{issue.issue_categories.name}</span>
+                            <span>{issue.issue_categories?.name || 'Uncategorized'}</span>
                           </div>
 
                           <div className={`font-medium ${getPriorityColor(issue.priority)}`}>
