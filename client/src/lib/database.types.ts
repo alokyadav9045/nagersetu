@@ -33,6 +33,7 @@ export interface Database {
           last_login?: string | null
           updated_at?: string
         }
+        Relationships: []
       }
       issues: {
         Row: {
@@ -84,6 +85,7 @@ export interface Database {
           resolved_at?: string | null
           updated_at?: string
         }
+        Relationships: []
       }
       issue_categories: {
         Row: {
@@ -94,6 +96,7 @@ export interface Database {
           color: string
           created_at: string
         }
+        Relationships: []
       }
       issue_votes: {
         Row: {
@@ -108,6 +111,7 @@ export interface Database {
           user_id: string
           vote_type: 'upvote' | 'downvote'
         }
+        Relationships: []
       }
       issue_comments: {
         Row: {
@@ -122,6 +126,7 @@ export interface Database {
           user_id: string
           comment: string
         }
+        Relationships: []
       }
       issue_updates: {
         Row: {
@@ -140,6 +145,7 @@ export interface Database {
           update_text?: string
           admin_id?: string | null
         }
+        Relationships: []
       }
       activity_logs: {
         Row: {
@@ -165,7 +171,20 @@ export interface Database {
           description?: string
           metadata?: any
         }
+        Relationships: []
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }

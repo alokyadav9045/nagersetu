@@ -1,75 +1,68 @@
+
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import type { Database } from '@/types/supabase'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { toast } from 'react-hot-toast'
-import { 
-  User, Mail, Phone, MapPin, Calendar, Edit, Save, X, 
-  Shield, Activity, CheckCircle, Clock, AlertTriangle 
-} from 'lucide-react'
+import { User, Mail, Phone, MapPin, Calendar, Edit, Save, X, Shield, Activity, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
 
-interface UserProfile {
-  id: string
-  email: string
-  full_name?: string
-  phone?: string
-  address?: string
-  role?: string
-  created_at: string
-  updated_at: string
-}
-
-interface Issue {
-  status: string
-}
+type UserProfile = Database['public']['Tables']['user_profiles']['Row']
+type UserProfileInsert = Database['public']['Tables']['user_profiles']['Insert']
+type UserProfileUpdate = Database['public']['Tables']['user_profiles']['Update']
+type IssueRow = Database['public']['Tables']['issues']['Row']
 
 export default function ProfilePage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [stats, setStats] = useState({
-    totalIssues: 0,
-    resolvedIssues: 0,
-    pendingIssues: 0
-  })
+  const [stats, setStats] = useState({ totalIssues: 0, resolvedIssues: 0, pendingIssues: 0 })
+  const [formData, setFormData] = useState({ full_name: '', phone: '', address: '' })
 
-  const [formData, setFormData] = useState({
-    full_name: '',
-    phone: '',
-    address: ''
-  })
+  useEffect(() => { void initializePage() }, [])
 
-  useEffect(() => {
-    initializePage()
-  }, [])
-
-  const initializePage = async () => {
-    await getUser()
-    setLoading(false)
+  async function initializePage() {
+    try {
+      await getUser()
+    } catch (error) {
+      console.error('Initialization error:', error)
+      toast.error('Failed to initialize profile page')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const getUser = async () => {
+  async function getUser() {
     try {
-      const { data: { user }, error } = await supabase.auth.getUser()
-      if (!user) {
+      const { data: authData, error: authError } = await supabase.auth.getUser()
+      if (authError) throw authError
+      const userObj = authData?.user
+      if (!userObj) {
         toast.error('Please login to view your profile')
         router.push('/')
         return
       }
+      setUser(userObj)
 
-      setUser(user)
-
-      // Get user profile
-      const { data: profileData, error: profileError } = await supabase
+      // Get user profile (array form to avoid 406 from single-object Accept header)
+      const { data: profileRows, error: profileError } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', user.id)
-        .maybeSingle()
+        .eq('id', userObj.id)
+        .limit(1)
+        .returns<UserProfile[]>()
 
-      if (profileData) {
+      if (profileError) {
+        console.error('Error fetching profile:', profileError)
+        toast.error(`Error fetching profile: ${profileError.message || profileError.code || 'Unknown error'}`)
+      }
+
+      const profileData = Array.isArray(profileRows) && profileRows.length > 0 ? profileRows[0] : null
+      if (profileData && typeof profileData === 'object') {
         setProfile(profileData as UserProfile)
         setFormData({
           full_name: (profileData as UserProfile).full_name || '',
@@ -78,29 +71,31 @@ export default function ProfilePage() {
         })
       } else {
         // Profile doesn't exist, create one
-        const newProfile: UserProfile = {
-          id: user.id,
-          email: user.email || '',
-          role: 'citizen',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+        const insertProfile: UserProfileInsert = {
+          id: userObj.id,
+          email: userObj.email || '',
+          role: 'citizen'
         }
-
-        const { data: createdProfile, error: createError } = await supabase
+        const { data: createdRows, error: createError } = await supabase
           .from('user_profiles')
-          .insert(newProfile as any)
+          .insert([insertProfile] as any)
           .select()
-          .single()
-
-        if (createdProfile && !createError) {
-          setProfile(createdProfile as UserProfile)
-          setFormData({
-            full_name: '',
-            phone: '',
-            address: ''
+          .returns<UserProfile[]>()
+        if (createError) {
+          // Only log available error properties
+          console.error('Failed to create profile:', {
+            message: createError.message,
+            details: (createError as any).details,
+            hint: (createError as any).hint,
+            code: (createError as any).code,
+            raw: createError
           })
-        } else {
-          console.error('Failed to create profile:', createError)
+          toast.error(`Failed to create profile: ${createError.message || createError.code || 'Unknown error'}`)
+        }
+        const createdProfile = Array.isArray(createdRows) && createdRows.length > 0 ? createdRows[0] : null
+        if (createdProfile && typeof createdProfile === 'object') {
+          setProfile(createdProfile)
+          setFormData({ full_name: '', phone: '', address: '' })
         }
       }
 
@@ -108,50 +103,44 @@ export default function ProfilePage() {
       const { data: issuesData, error: issuesError } = await supabase
         .from('issues')
         .select('status')
-        .eq('citizen_id', user.id)
-
+        .eq('citizen_id', userObj.id)
+        .returns<Array<Pick<IssueRow, 'status'>>>()
+      if (issuesError) {
+        console.error('Error fetching issues:', issuesError)
+        toast.error(`Error fetching issues: ${issuesError.message || issuesError.code || 'Unknown error'}`)
+      }
       if (issuesData) {
         const total = issuesData.length
-        const resolved = (issuesData as Issue[]).filter(issue => issue.status === 'resolved').length
-        const pending = (issuesData as Issue[]).filter(issue => issue.status === 'pending').length
-
-        setStats({
-          totalIssues: total,
-          resolvedIssues: resolved,
-          pendingIssues: pending
-        })
+        const resolved = issuesData.filter((issue: Partial<IssueRow>) => issue.status === 'resolved').length
+        const pending = issuesData.filter((issue: Partial<IssueRow>) => issue.status === 'pending').length
+        setStats({ totalIssues: total, resolvedIssues: resolved, pendingIssues: pending })
       }
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch user data:', error)
-      toast.error('Failed to load profile data')
+      toast.error(`Failed to load profile data: ${error.message || error.code || 'Unknown error'}`)
     }
   }
 
-  const handleSave = async () => {
+  async function handleSave() {
     setSaving(true)
-    
     try {
-      const updateData = {
+      if (!user?.id) {
+        toast.error('Not signed in')
+        return
+      }
+      const now = new Date().toISOString()
+      const updateData: UserProfileUpdate = {
         full_name: formData.full_name,
         phone: formData.phone,
         address: formData.address,
-        updated_at: new Date().toISOString()
+        updated_at: now
       }
-
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('user_profiles')
-        // @ts-ignore - Supabase type generation issue
         .update(updateData)
         .eq('id', user.id)
-
       if (error) throw error
-
-      setProfile(prev => prev ? { 
-        ...prev, 
-        ...formData,
-        updated_at: new Date().toISOString()
-      } : null)
+      setProfile(prev => prev ? { ...prev, ...formData, updated_at: now } : null)
       setEditing(false)
       toast.success('Profile updated successfully!')
     } catch (error: any) {
@@ -162,7 +151,7 @@ export default function ProfilePage() {
     }
   }
 
-  const handleCancel = () => {
+  function handleCancel() {
     setFormData({
       full_name: profile?.full_name || '',
       phone: profile?.phone || '',
@@ -219,7 +208,6 @@ export default function ProfilePage() {
                   </p>
                 </div>
               </div>
-              
               {!editing && (
                 <button
                   onClick={() => setEditing(true)}
@@ -231,7 +219,6 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
-
           {/* Stats */}
           <div className="px-8 py-6 bg-gray-50 border-b">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Activity Overview</h2>
@@ -241,13 +228,11 @@ export default function ProfilePage() {
                 <div className="text-2xl font-bold text-gray-900">{stats.totalIssues}</div>
                 <div className="text-sm text-gray-500">Total Issues Reported</div>
               </div>
-              
               <div className="bg-white rounded-lg p-4 text-center">
                 <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-gray-900">{stats.resolvedIssues}</div>
                 <div className="text-sm text-gray-500">Issues Resolved</div>
               </div>
-              
               <div className="bg-white rounded-lg p-4 text-center">
                 <Clock className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-gray-900">{stats.pendingIssues}</div>
@@ -255,12 +240,10 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-
           {/* Profile Information */}
           <div className="px-8 py-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-gray-900">Profile Information</h2>
-              
               {editing && (
                 <div className="flex items-center space-x-3">
                   <button
@@ -285,7 +268,6 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Email */}
               <div>
@@ -298,7 +280,6 @@ export default function ProfilePage() {
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
               </div>
-
               {/* Full Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -309,7 +290,7 @@ export default function ProfilePage() {
                   <input
                     type="text"
                     value={formData.full_name}
-                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    onChange={e => setFormData({ ...formData, full_name: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter your full name"
                   />
@@ -319,7 +300,6 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
-
               {/* Phone */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -330,7 +310,7 @@ export default function ProfilePage() {
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter your phone number"
                   />
@@ -340,7 +320,6 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
-
               {/* Role */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -353,7 +332,6 @@ export default function ProfilePage() {
                 <p className="text-xs text-gray-500 mt-1">Role is managed by administrators</p>
               </div>
             </div>
-
             {/* Address */}
             <div className="mt-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -363,7 +341,7 @@ export default function ProfilePage() {
               {editing ? (
                 <textarea
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={e => setFormData({ ...formData, address: e.target.value })}
                   rows={3}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter your address"
@@ -374,7 +352,6 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
-
             {/* Account Information */}
             <div className="mt-8 pt-6 border-t border-gray-200">
               <h3 className="text-md font-semibold text-gray-900 mb-4">Account Information</h3>

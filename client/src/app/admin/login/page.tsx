@@ -23,12 +23,22 @@ export default function AdminLoginPage() {
       const ADMIN_PASSWORD = 'Nagarsetu@Admin2025'
 
       if (formData.email === ADMIN_EMAIL && formData.password === ADMIN_PASSWORD) {
+        // Call API to set httpOnly cookie for middleware
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email, password: formData.password })
+        })
+        if (!res.ok) {
+          toast.error('Failed to establish admin session')
+          setLoginLoading(false)
+          return
+        }
         const session = {
           authenticated: true,
           timestamp: new Date().toISOString(),
           email: formData.email
         }
-        
         localStorage.setItem('nagarsetu_admin_session', JSON.stringify(session))
         toast.success('Welcome to Nagarsetu Admin Panel!')
         router.push('/admin')
