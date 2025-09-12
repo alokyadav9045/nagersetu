@@ -35,7 +35,7 @@ interface Issue {
     full_name: string | null
     email: string
   } | null
-  categories?: {
+  issue_categories?: {
     name: string
     color: string
   } | null
@@ -133,7 +133,7 @@ export default function AdminIssues() {
             full_name, 
             email
           ),
-          categories (
+          issue_categories (
             name,
             color
           )
@@ -155,7 +155,7 @@ export default function AdminIssues() {
       // Apply sorting
       query = query.order(sortBy, { ascending: sortOrder === 'asc' })
 
-      const { data, error } = await query
+  const { data, error, status } = await query
 
       if (error) {
         // Detailed error logging for debugging
@@ -202,6 +202,55 @@ export default function AdminIssues() {
           console.warn('Error object without message:', error)
           toast.error('Unknown database error occurred. Please try again or contact support.')
           setIssues([])
+          return
+        }
+
+        // If it's a bad request possibly due to embeds (PGRST200), retry without embeds
+        const errMsg = `${error.message || ''} ${error.details || ''}`
+        const isEmbedError = (status === 400) || /PGRST|embedded|relationship|Bad Request/i.test(errMsg)
+
+        if (isEmbedError) {
+          console.warn('Embed query failed, retrying without embeds...')
+          // Fetch base issues first
+          let base = (supabase as any).from('issues').select('*')
+          if (statusFilter !== 'all') base = base.eq('status', statusFilter)
+          if (priorityFilter !== 'all') base = base.eq('priority', priorityFilter)
+          if (searchTerm.trim()) base = base.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+          base = base.order(sortBy, { ascending: sortOrder === 'asc' })
+          const { data: baseIssues, error: baseErr } = await base
+          if (baseErr) {
+            console.error('Fallback base issues query failed:', baseErr)
+            toast.error(`Failed to fetch issues: ${baseErr.message || 'Unknown error'}`)
+            setIssues([])
+            return
+          }
+
+          const ids = (baseIssues || []).map((i: any) => i.id)
+          const citizenIds = (baseIssues || []).map((i: any) => i.citizen_id).filter(Boolean)
+          const categoryIds = (baseIssues || []).map((i: any) => i.category_id).filter(Boolean)
+
+          // Fetch related tables in parallel (best-effort)
+          const [usersRes, catsRes] = await Promise.allSettled([
+            citizenIds.length ? (supabase as any).from('user_profiles').select('id,full_name,email').in('id', citizenIds) : Promise.resolve({ data: [] }),
+            categoryIds.length ? (supabase as any).from('issue_categories').select('id,name,color').in('id', categoryIds) : Promise.resolve({ data: [] })
+          ])
+
+          const usersMap = new Map<string, any>()
+          if (usersRes.status === 'fulfilled' && !(usersRes.value as any).error) {
+            ((usersRes.value as any).data || []).forEach((u: any) => usersMap.set(u.id, { full_name: u.full_name, email: u.email }))
+          }
+          const catsMap = new Map<number, any>()
+          if (catsRes.status === 'fulfilled' && !(catsRes.value as any).error) {
+            ((catsRes.value as any).data || []).forEach((c: any) => catsMap.set(c.id, { name: c.name, color: c.color }))
+          }
+
+          const hydrated = (baseIssues || []).map((i: any) => ({
+            ...i,
+            user_profiles: usersMap.get(i.citizen_id) || null,
+            issue_categories: catsMap.get(i.category_id) || null,
+          }))
+
+          setIssues(hydrated)
           return
         }
 
@@ -352,6 +401,22 @@ export default function AdminIssues() {
     }
   }
 
+  const deleteIssueEverywhere = async (issueId: string) => {
+    if (!confirm('Delete this issue and all its related data?')) return
+    try {
+      const res = await fetch(`/api/issues/${issueId}/delete`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Delete failed')
+      }
+      toast.success('Issue deleted')
+      await Promise.all([fetchIssues(), fetchStats()])
+    } catch (e: any) {
+      console.error('Admin delete failed:', e)
+      toast.error(e?.message || 'Failed to delete issue')
+    }
+  }
+
   // Get status badge with proper styling
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; variant: any; color: string }> = {
@@ -420,7 +485,7 @@ export default function AdminIssues() {
           `"${issue.description.replace(/"/g, '""')}"`, // Escape quotes
           issue.status,
           issue.priority,
-          issue.categories?.name || 'No category',
+          issue.issue_categories?.name || 'No category',
           issue.user_profiles?.full_name || issue.user_profiles?.email || 'Unknown',
           `"${issue.location_address || 'No location'}"`,
           new Date(issue.created_at).toLocaleString(),
@@ -627,12 +692,12 @@ export default function AdminIssues() {
                           </h3>
                           {getStatusBadge(issue.status)}
                           {getPriorityBadge(issue.priority)}
-                          {issue.categories && (
+                          {issue.issue_categories && (
                             <span 
                               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white"
-                              style={{ backgroundColor: issue.categories.color }}
+                              style={{ backgroundColor: issue.issue_categories.color }}
                             >
-                              {issue.categories.name}
+                              {issue.issue_categories.name}
                             </span>
                           )}
                         </div>
@@ -697,6 +762,10 @@ export default function AdminIssues() {
                       {updating === issue.id && (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                       )}
+
+                      <Button variant="destructive" size="sm" onClick={() => deleteIssueEverywhere(issue.id)}>
+                        Delete
+                      </Button>
                     </div>
                   </div>
                 </CardContent>

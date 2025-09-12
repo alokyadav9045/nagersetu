@@ -18,10 +18,13 @@ export function AdminFooter({ className = '' }: AdminFooterProps) {
     resolvedIssues: 0,
     pendingIssues: 0
   })
+  const [lastUpdated, setLastUpdated] = useState<string>('')
 
   useEffect(() => {
     const run = async () => {
       await fetchStats()
+      // Update a stable client-only timestamp to avoid hydration mismatch
+      setLastUpdated(new Date().toLocaleTimeString())
     }
 
     run()
@@ -80,7 +83,11 @@ export function AdminFooter({ className = '' }: AdminFooterProps) {
     }
   }
 
-  const currentYear = new Date().getFullYear()
+  // Avoid server/client mismatch by computing year on client only
+  const [currentYear, setCurrentYear] = useState<string>('')
+  useEffect(() => {
+    setCurrentYear(String(new Date().getFullYear()))
+  }, [])
 
   return (
     <footer className={`bg-gray-50 border-t border-gray-200 mt-auto ${className}`}>
@@ -218,8 +225,8 @@ export function AdminFooter({ className = '' }: AdminFooterProps) {
                 <div className="h-2 w-2 bg-green-500 rounded-full"></div>
                 <span className="text-sm text-gray-600">All Systems Operational</span>
               </div>
-              <p className="text-xs text-gray-500">
-                Last updated: {new Date().toLocaleTimeString()}
+              <p className="text-xs text-gray-500" suppressHydrationWarning>
+                Last updated: {lastUpdated || '—'}
               </p>
             </div>
           </div>
@@ -229,7 +236,8 @@ export function AdminFooter({ className = '' }: AdminFooterProps) {
         <div className="mt-8 pt-8 border-t border-gray-200">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-sm text-gray-500">
-              © {currentYear} Nagarsetu. All rights reserved.
+              <span suppressHydrationWarning>{currentYear ? `© ${currentYear} ` : ''}</span>
+              Nagarsetu. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <a href="#" className="text-sm text-gray-500 hover:text-blue-600">

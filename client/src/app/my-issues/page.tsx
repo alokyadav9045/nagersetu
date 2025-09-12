@@ -127,23 +127,18 @@ export default function MyIssuesPage() {
   }
 
   const deleteIssue = async (issueId: string) => {
-    if (!confirm('Are you sure you want to delete this issue? This action cannot be undone.')) {
-      return
-    }
-
+    if (!confirm('Delete this issue and all related comments, votes, and updates?')) return
     try {
-      const { error } = await supabase
-        .from('issues')
-        .delete()
-        .eq('id', issueId)
-
-      if (error) throw error
-
+      const res = await fetch(`/api/issues/${issueId}/delete`, { method: 'POST' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Delete failed')
+      }
       setIssues(prev => prev.filter(issue => issue.id !== issueId))
-      toast.success('Issue deleted successfully')
-    } catch (error) {
+      toast.success('Issue deleted everywhere')
+    } catch (error: any) {
       console.error('Failed to delete issue:', error)
-      toast.error('Failed to delete issue')
+      toast.error(error?.message || 'Failed to delete issue')
     }
   }
 
